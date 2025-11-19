@@ -58,8 +58,10 @@ jobs:
         with:
           args: >
             -Dsonar.projectKey=remittance-api
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
             -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+            -Dsonar.sources=src/
             -Dsonar.junit.reportPaths=target/surefire-reports
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
 
