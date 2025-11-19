@@ -23,10 +23,10 @@ jobs:
         uses: actions/checkout@v4
 
       # --- Download & Parse Terraform Outputs ---
-      - name: Download infra outputs
-        uses: actions/download-artifact@v4
-        with:
-          name: infra-outputs
+      - name: Download infra outputs from S3
+        run: |
+          aws s3 cp s3://$BUCKET_TF_STATE/infra-outputs.json infra-outputs.json \
+            --region $AWS_REGION
 
       - name: Parse outputs
         id: parse
