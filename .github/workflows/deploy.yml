@@ -1,6 +1,13 @@
 name: Build, Scan & Deploy Remittance API
 
-on: workflow_dispatch
+on:
+  workflow_run:
+    workflows: ["Payment-API Terraform CI/CD"]
+    types:
+      - completed
+permissions:
+  contents: read
+  actions: read
 
 jobs:
   build-test-scan-deploy:
