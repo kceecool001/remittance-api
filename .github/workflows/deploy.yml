@@ -57,7 +57,7 @@ jobs:
         uses: sonarsource/sonarqube-scan-action@v2
         with:
           args: >
-            -Dsonar.projectKey=remittance-api
+            -Dsonar.projectKey=kceecool001_remittance-api
             -Dsonar.organization=kceecool001
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
             -Dsonar.login=${{ secrets.SONAR_TOKEN }}

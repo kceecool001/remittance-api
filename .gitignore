@@ -62,4 +62,4 @@ logs/*
 combined.log
 error.log
 *.deploy.sh
-deploy.sh
+deploy.sh##
