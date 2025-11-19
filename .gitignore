@@ -1,0 +1,65 @@
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.bak
+*.tmp
+*.log
+.vscode/
+.idea/
+
+# --- Terraform ---
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*.terraform.lock.hcl
+.terraform/
+.terraformrc
+terraform.rc
+
+# --- AWS / Cloud ---
+# Ignore local AWS credentials/config
+.aws/
+
+# --- GitHub Actions ---
+# Ignore runner temp files
+*_temp/
+*_work/
+
+# --- Java / Maven ---
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.iml
+
+# --- Docker ---
+# Ignore local Docker build context artifacts
+*.tar
+*.pid
+*.sock
+
+# --- Node / NPM (if frontend or scripts exist) ---
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# --- Output Artifacts ---
+infra-outputs.json
+taskdef.json
+
+# --- Secrets ---
+.env
+.env.*
+*.secret
+*.key
+*.pem
+logs/*
+combined.log
+error.log
+*.deploy.sh
+deploy.sh

@@ -1,0 +1,123 @@
+name: Build, Scan & Deploy Remittance API
+
+on: workflow_dispatch
+
+jobs:
+  build-test-scan-deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-1
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # --- Download & Parse Terraform Outputs ---
+      - name: Download infra outputs
+        uses: actions/download-artifact@v4
+        with:
+          name: infra-outputs
+
+      - name: Parse outputs
+        id: parse
+        run: |
+          CLUSTER=$(jq -r '.ecs_cluster_name.value' infra-outputs.json)
+          SERVICE=$(jq -r '.ecs_service_name.value' infra-outputs.json)
+          REPO=$(jq -r '.ecr_repository_url.value' infra-outputs.json)
+          EXEC_ROLE=$(jq -r '.ecs_task_execution_role_arn.value' infra-outputs.json)
+          TASK_ROLE=$(jq -r '.ecs_task_role_arn.value' infra-outputs.json)
+          DB_SECRET=$(jq -r '.db_password_secret_arn.value' infra-outputs.json)
+
+          echo "ECS_CLUSTER=$CLUSTER" >> $GITHUB_ENV
+          echo "ECS_SERVICE=$SERVICE" >> $GITHUB_ENV
+          echo "ECR_REPO=$REPO" >> $GITHUB_ENV
+          echo "TASK_EXEC_ROLE=$EXEC_ROLE" >> $GITHUB_ENV
+          echo "TASK_ROLE=$TASK_ROLE" >> $GITHUB_ENV
+          echo "DB_PASSWORD_SECRET_ARN=$DB_SECRET" >> $GITHUB_ENV
+
+      # --- Build & Test ---
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Run Tests
+        run: mvn clean test
+
+      # --- Sonar Scan ---
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v2
+        with:
+          args: >
+            -Dsonar.projectKey=remittance-api
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+            -Dsonar.junit.reportPaths=target/surefire-reports
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+
+      # --- Build & Push Image ---
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        run: docker build -t remittance-api:latest .
+
+      - name: Tag & Push Image
+        run: |
+          IMAGE_TAG=${GITHUB_SHA}
+          docker tag remittance-api:latest $ECR_REPO:$IMAGE_TAG
+          docker push $ECR_REPO:$IMAGE_TAG
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      # --- Register Task Definition ---
+      - name: Register ECS Task Definition
+        run: |
+          cat > taskdef.json <<EOF
+          {
+            "family": "payment-api-task",
+            "networkMode": "awsvpc",
+            "requiresCompatibilities": ["FARGATE"],
+            "cpu": "256",
+            "memory": "512",
+            "executionRoleArn": "$TASK_EXEC_ROLE",
+            "taskRoleArn": "$TASK_ROLE",
+            "containerDefinitions": [
+              {
+                "name": "remittance-api",
+                "image": "$ECR_REPO:$IMAGE_TAG",
+                "essential": true,
+                "portMappings": [
+                  { "containerPort": 3000, "hostPort": 3000 }
+                ],
+                "secrets": [
+                  {
+                    "name": "DB_PASS",
+                    "valueFrom": "$DB_PASSWORD_SECRET_ARN"
+                  }
+                ]
+              }
+            ]
+          }
+          EOF
+
+          aws ecs register-task-definition --cli-input-json file://taskdef.json
+
+      # --- Update ECS Service ---
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --force-new-deployment
