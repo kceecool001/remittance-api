@@ -58,7 +58,7 @@ jobs:
         with:
           args: >
             -Dsonar.projectKey=remittance-api
-            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
+            -Dsonar.organization=kceecool001
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
             -Dsonar.login=${{ secrets.SONAR_TOKEN }}
             -Dsonar.sources=src/
